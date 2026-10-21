@@ -1,0 +1,52 @@
+# Infraestructura compartida para las instancias de los restaurantes: proxy (Traefik) + Postgres.
+# El panel (api-admin-foodtag) crea una base y un contenedor por restaurante dentro de esta red.
+#   docker compose up -d
+#   Panel (api/.env): PROVISIONER=docker  INSTANCE_NETWORK=foodtag  INSTANCE_ENTRYPOINT=websecure  INSTANCE_CERT_RESOLVER=le
+#                     TENANT_DB_CONTAINER=foodtag-db  TENANT_DB_INTERNAL_HOST=db  TENANT_DB_PASS=<POSTGRES_PASSWORD>
+# El DNS de *.foodtag.com (dominio provisorio) tiene que apuntar a este servidor.
+name: foodtag
+
+services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=foodtag
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      # Certificados (Let's Encrypt): requiere que los dominios apunten a este servidor
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?definí ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks: [foodtag]
+
+  db:
+    image: postgres:16-alpine
+    container_name: foodtag-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definí POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [foodtag]
+    # Solo el panel (en el host) necesita llegar a la base para crear las de cada restaurante
+    ports:
+      - "127.0.0.1:5432:5432"
+
+volumes:
+  letsencrypt:
+  pgdata:
+
+networks:
+  foodtag:
+    name: foodtag
