@@ -7,6 +7,14 @@ export interface InstanceStatus {
   restaurant: { name: string; timezone: string; modules: string[]; users: number; modulesMissing: string[]; suspended: boolean } | null;
 }
 
+/** Pulseras extraviadas o rotas de un restaurante que la plataforma todavía tiene que reponer (lo informa la instancia). */
+export interface NfcReplenishment {
+  total: number;
+  lost: number;
+  broken: number;
+  pending: { id: number; uid: string; condition: "LOST" | "BROKEN"; note: string | null; at: string | null }[];
+}
+
 /** Valida y normaliza la URL base de una instancia (sin barra final; https salvo que se permita http). */
 export function normalizeInstanceUrl(raw: string): string {
   let url: URL;
@@ -61,6 +69,15 @@ export class PlatformClient {
 
   upsertOwner(slug: string, input: { email: string; password: string; name?: string }) {
     return this.call<{ id: number; email: string; name: string | null; created: boolean }>("PUT", `/restaurants/${encodeURIComponent(slug)}/owner`, input);
+  }
+
+  /** `null` si el restaurante no usa el módulo de pulseras en su instancia. */
+  nfcReplenishment(slug: string) {
+    return this.call<NfcReplenishment | null>("GET", `/restaurants/${encodeURIComponent(slug)}/nfc`);
+  }
+
+  nfcMarkReplaced(slug: string, tagIds?: number[]) {
+    return this.call<{ replaced: number }>("POST", `/restaurants/${encodeURIComponent(slug)}/nfc/replaced`, tagIds ? { tagIds } : {});
   }
 
   async status(slug: string): Promise<InstanceStatus> {

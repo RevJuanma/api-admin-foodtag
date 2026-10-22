@@ -8,6 +8,7 @@ import * as tenants from "@/services/tenant.service";
 import * as audit from "@/services/audit.service";
 import * as provisioning from "@/services/provisioning.service";
 import * as backups from "@/services/backup.service";
+import * as nfcReplenishment from "@/services/nfcReplenishment.service";
 import { provisioning as provisioningConfig } from "@/config/env";
 import { publicUrlFor } from "@/services/provisioner/names";
 
@@ -86,6 +87,11 @@ router.get("/backups/:backupId/download", async (req: Request, res: Response) =>
 router.delete("/backups/:backupId", run((req) => backups.deleteBackup(Number(req.params.backupId), actor(req))));
 router.put("/tenants/:id/owner", run((req) => tenants.upsertOwner(id(req), req.body ?? {}, actor(req))));
 router.get("/tenants/:id/instance-env", run((req) => tenants.instanceEnv(id(req), actor(req))));
+
+// ── Reposición de pulseras: las extraviadas o rotas que informa cada instancia
+router.get("/nfc/replenishment", run(() => nfcReplenishment.overview()));
+router.get("/tenants/:id/nfc", run((req) => nfcReplenishment.forTenant(id(req))));
+router.post("/tenants/:id/nfc/replaced", run((req) => nfcReplenishment.markReplaced(id(req), req.body?.tagIds, actor(req))));
 
 router.get("/audit", run((req) => audit.list({ tenantId: typeof req.query.tenantId === "string" ? req.query.tenantId : undefined, limit: Number(req.query.limit) || undefined })));
 
